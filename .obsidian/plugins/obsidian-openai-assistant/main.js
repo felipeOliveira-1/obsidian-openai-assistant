@@ -29,7 +29,7 @@ class OpenAIAssistantPlugin extends Plugin {
             // Adicionar comando para abrir o chatbot
             this.addCommand({
                 id: 'openai-assistant-open-chatbot',
-                name: 'Abrir Assistente OpenAI',
+                name: 'Abrir Assistente com AI',
                 callback: () => {
                     this.activateChatbotView();
                 }
@@ -538,7 +538,7 @@ class ChatbotView extends ItemView {
         
         // Header com título e botões
         const header = this.contentEl.createEl("div", { cls: "chatbot-header" });
-        header.createEl("h3", { text: "Assistente OpenAI" });
+        header.createEl("h3", { text: "AI Obsidian FSTech" });
         
         // Container para botões de ação
         const actionButtons = header.createEl("div", { cls: "chatbot-action-buttons" });
@@ -597,7 +597,7 @@ class ChatbotView extends ItemView {
                 
                 // Adicionar mensagem de boas-vindas novamente
                 await this.addBotMessage({
-                    content: "Olá! Sou VaultArchitect, seu especialista em otimização de vault Obsidian. Vou guiá-lo através de uma avaliação sistemática do seu setup atual antes de fazer recomendações. Vamos começar.",
+                    content: "Olá! Sou AI Obsidian FSTech, seu especialista em otimização de vault Obsidian. Vou guiá-lo através de uma avaliação sistemática do seu setup atual antes de fazer recomendações. Vamos começar.",
                     type: "text"
                 });
                 
@@ -675,24 +675,18 @@ class ChatbotView extends ItemView {
         this.apiMessages = [
             {
                 role: "system",
-                content: `Você é VaultArchitect, um assistente especializado em otimização de vaults do Obsidian.
+                content: `Você é AI Vault, um assistente especializado em otimização de vaults do Obsidian.
                 Sua função é ajudar o usuário a organizar melhor seu vault, criar estruturas eficientes,
                 e implementar fluxos de trabalho produtivos com o Obsidian.
                 
                 Seu vault tem as seguintes pastas (as principais são):
                 - notas/: pasta principal para armazenar notas
                 - anexos/: para armazenar imagens, PDFs e outros arquivos
-                - templates/: modelos para criação de novas notas
                 - projetos/: para armazenar projetos
                 
                 Lista completa de pastas disponíveis no vault:
                 ${existingFolders.join('\n                - ')}
-                
-                Os templates disponíveis são:
-                - template-nota-basica.md: estrutura básica para notas gerais
-                - template-kabalah.md: específico para estudos de Kabalah
-                - template-projeto.md: para gerenciamento de projetos
-                
+                                            
                 Você pode executar ações no vault do usuário:
                 1. Criar notas novas usando [AÇÃO:CRIAR_NOTA]
                 2. Criar pastas novas usando [AÇÃO:CRIAR_PASTA]
