@@ -31,22 +31,25 @@ plugins/
 
 ### 2.1. Criar Diretórios
 
-- Crie as pastas `modals/`, `settings/` e `utils/` dentro de `plugins/obsidian-openai-assistant/`.
+- [x] Crie a pasta `modals/` dentro de `plugins/obsidian-openai-assistant/`.
+- [x] Crie as pastas `settings/` e `utils/` dentro de `plugins/obsidian-openai-assistant/`.
 
 ### 2.2. Mover e Separar Classes
 
-- **Modals:**  
-  Mova cada classe de modal (CreateNoteModal, EditContentModal, VerifyContentModal) para um arquivo próprio em `modals/`.
-- **Settings:**  
-  Mova a classe `OpenAIAssistantSettingTab` para `settings/OpenAIAssistantSettingTab.js`.
-- **Utils:**  
-  Crie `utils/openai.js` para funções auxiliares como chamada à API, validações, tratamento de erros etc.
+- [x] **Modals:**  
+  - [x] Mover a classe CreateNoteModal para `modals/CreateNoteModal.js`.
+  - [x] Mover a classe EditContentModal para `modals/EditContentModal.js`.
+  - [x] Mover a classe VerifyContentModal para `modals/VerifyContentModal.js`.
+- [x] **Settings:**  
+  - [x] Mover a classe `OpenAIAssistantSettingTab` para `settings/OpenAIAssistantSettingTab.js`.
+- [x] **Utils:**  
+  - [x] Criar `utils/openai.js` para funções auxiliares como chamada à API, validações, tratamento de erros etc.
 
 ### 2.3. Ajustar Imports/Requires
 
-- Atualize os arquivos para importar/exportar as classes e funções conforme necessário.
-  - Use `module.exports` e `require()` para CommonJS.
-  - Ou `export`/`import` para ES Modules (se o projeto suportar).
+- [x] Atualize os arquivos para importar/exportar as classes e funções conforme necessário.
+  - [x] Use `module.exports` e `require()` para CommonJS.
+  - [ ] Ou `export`/`import` para ES Modules (se o projeto suportar).
 
 ### 2.4. Refatorar o main.js
 

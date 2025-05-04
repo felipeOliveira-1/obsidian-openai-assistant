@@ -1,4 +1,9 @@
-const { Plugin, Notice, Modal, Setting } = require('obsidian');
+const { Plugin, Notice } = require('obsidian');
+const { CreateNoteModal } = require('./modals/CreateNoteModal');
+const { EditContentModal } = require('./modals/EditContentModal');
+const { VerifyContentModal } = require('./modals/VerifyContentModal');
+const { OpenAIAssistantSettingTab } = require('./settings/OpenAIAssistantSettingTab');
+const { callOpenAI } = require('./utils/openai');
 
 class OpenAIAssistantPlugin extends Plugin {
     async onload() {
@@ -59,6 +64,8 @@ class OpenAIAssistantPlugin extends Plugin {
 
     // Método para fazer chamada à API da OpenAI
     async callOpenAI(prompt, systemPrompt = "Você é um assistente útil.") {
+        return await callOpenAI(this.settings, prompt, systemPrompt);
+    
         if (!this.settings.apiKey) {
             new Notice('API Key da OpenAI não configurada. Configure nas configurações do plugin.');
             return null;
@@ -518,159 +525,6 @@ class CreateNoteModal extends Modal {
         const date = new Date();
         const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
         return `notas/IA_Gerada_${dateStr}.md`;
-    }
-
-    onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
-    }
-}
-
-// Modal para editar conteúdo
-class EditContentModal extends Modal {
-    constructor(app, plugin, content, editor) {
-        super(app);
-        this.plugin = plugin;
-        this.content = content;
-        this.editor = editor;
-        this.instruction = '';
-    }
-
-    onOpen() {
-        const { contentEl } = this;
-        contentEl.createEl('h2', { text: 'Editar com IA' });
-
-        // Mostrar o conteúdo selecionado
-        contentEl.createEl('h3', { text: 'Conteúdo selecionado:' });
-        const contentDiv = contentEl.createDiv();
-        contentDiv.addClass('content-preview');
-        contentDiv.setText(this.content.length > 300 ? this.content.substring(0, 300) + '...' : this.content);
-
-        // Campo para instruções
-        new Setting(contentEl)
-            .setName('Instruções para edição')
-            .setDesc('Como a IA deve modificar o conteúdo?')
-            .addTextArea(text => text
-                .setPlaceholder('Ex: Reescreva de forma mais formal...')
-                .onChange(value => {
-                    this.instruction = value;
-                }));
-
-        // Botões
-        const buttonDiv = contentEl.createDiv();
-        buttonDiv.addClass('modal-button-container');
-
-        const cancelButton = buttonDiv.createEl('button', { text: 'Cancelar' });
-        cancelButton.addEventListener('click', () => this.close());
-
-        const editButton = buttonDiv.createEl('button', { text: 'Editar' });
-        editButton.addClass('mod-cta');
-        editButton.addEventListener('click', async () => {
-            if (!this.instruction) {
-                new Notice('Por favor, insira instruções para a edição.');
-                return;
-            }
-
-            new Notice('Editando conteúdo com IA...');
-            editButton.disabled = true;
-
-            const prompt = `Conteúdo original: "${this.content}"\n\nInstruções: ${this.instruction}`;
-            const systemPrompt = "Você é um editor especializado. Modifique o conteúdo fornecido de acordo com as instruções do usuário, mantendo o formato Markdown e a essência original quando apropriado.";
-            const result = await this.plugin.callOpenAI(prompt, systemPrompt);
-
-            if (result) {
-                this.editor.replaceSelection(result);
-                this.close();
-            } else {
-                new Notice('Não foi possível editar o conteúdo.');
-                editButton.disabled = false;
-            }
-        });
-    }
-
-    onClose() {
-        const { contentEl } = this;
-        contentEl.empty();
-    }
-}
-
-// Modal para verificar conteúdo
-class VerifyContentModal extends Modal {
-    constructor(app, plugin, content) {
-        super(app);
-        this.plugin = plugin;
-        this.content = content;
-        this.verifyType = 'gramatical';
-    }
-
-    onOpen() {
-        const { contentEl } = this;
-        contentEl.createEl('h2', { text: 'Verificar conteúdo com IA' });
-
-        // Mostrar o conteúdo selecionado
-        contentEl.createEl('h3', { text: 'Conteúdo a verificar:' });
-        const contentDiv = contentEl.createDiv();
-        contentDiv.addClass('content-preview');
-        contentDiv.setText(this.content.length > 300 ? this.content.substring(0, 300) + '...' : this.content);
-
-        // Opções de verificação
-        new Setting(contentEl)
-            .setName('Tipo de verificação')
-            .setDesc('Escolha o tipo de verificação a ser realizada')
-            .addDropdown(dropdown => dropdown
-                .addOption('gramatical', 'Verificação gramatical e ortográfica')
-                .addOption('factual', 'Verificação de fatos e consistência')
-                .addOption('estilo', 'Verificação de estilo e clareza')
-                .setValue(this.verifyType)
-                .onChange(value => {
-                    this.verifyType = value;
-                }));
-
-        // Botões
-        const buttonDiv = contentEl.createDiv();
-        buttonDiv.addClass('modal-button-container');
-
-        const cancelButton = buttonDiv.createEl('button', { text: 'Cancelar' });
-        cancelButton.addEventListener('click', () => this.close());
-
-        const verifyButton = buttonDiv.createEl('button', { text: 'Verificar' });
-        verifyButton.addClass('mod-cta');
-        verifyButton.addEventListener('click', async () => {
-            new Notice('Verificando conteúdo com IA...');
-            verifyButton.disabled = true;
-
-            let systemPrompt = "Você é um assistente especializado em verificação de conteúdo. ";
-            if (this.verifyType === 'gramatical') {
-                systemPrompt += "Analise o texto para encontrar erros gramaticais, ortográficos e de pontuação.";
-            } else if (this.verifyType === 'factual') {
-                systemPrompt += "Analise o texto para verificar a consistência, coerência e precisão factual aparente.";
-            } else {
-                systemPrompt += "Analise o texto quanto ao estilo, clareza, concisão e eficácia comunicativa.";
-            }
-
-            const prompt = `Por favor, verifique o seguinte conteúdo:\n\n${this.content}\n\nForneça uma análise detalhada, destacando problemas e sugerindo melhorias.`;
-            const result = await this.plugin.callOpenAI(prompt, systemPrompt);
-
-            if (result) {
-                // Criar nota de análise
-                const fileName = `notas/Análise_${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
-                const content = `# Análise de Conteúdo (${this.verifyType})\n\n## Conteúdo Original\n\n\\n${this.content}\n\\n\n## Análise\n\n${result}`;
-                
-                this.app.vault.create(fileName, content)
-                    .then(() => {
-                        new Notice(`Análise criada em '${fileName}'!`);
-                        this.close();
-                    })
-                    .catch(error => {
-                        console.error('Erro ao criar a nota de análise:', error);
-                        new Notice(`Erro ao criar a nota de análise: ${error.message}`);
-                        verifyButton.disabled = false;
-                    });
-            } else {
-                new Notice('Não foi possível verificar o conteúdo.');
-                verifyButton.disabled = false;
-            }
-        });
     }
 
     onClose() {
