@@ -12,9 +12,9 @@ class OpenAIAssistantPlugin extends Plugin {
         // Carregar configuraÃ§Ãµes
         this.settings = Object.assign({}, {
             apiKey: '',
-            model: 'gpt-4-turbo',
-            temperature: 0.7,
-            maxTokens: 4000
+            model: 'gpt-4.1',
+            temperature: 0.13,
+            maxTokens: 5000
         }, await this.loadData());
 
         // Registrar comandos
