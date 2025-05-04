@@ -653,7 +653,7 @@ class ChatbotView extends ItemView {
 
         // Mensagem de boas-vindas
         await this.addBotMessage({
-            content: "Olá! Sou VaultArchitect, seu especialista em otimização de vault Obsidian. Vou guiá-lo através de uma avaliação sistemática do seu setup atual antes de fazer recomendações. Vamos começar.",
+            content: "Olá! Sou AI Obsidian FSTech, seu especialista em otimização de vault Obsidian. Vou guiá-lo através de uma avaliação sistemática do seu setup atual antes de fazer recomendações. Vamos começar.",
             type: "text"
         });
 
