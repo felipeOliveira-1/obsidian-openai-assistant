@@ -90,15 +90,49 @@ class OpenAIAssistantPlugin extends Plugin {
             });
 
             if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || 'Erro desconhecido ao chamar a API da OpenAI');
+                let errorMsg = 'Erro desconhecido ao chamar a API da OpenAI.';
+                let errorTip = '';
+                let errorDetails = '';
+                try {
+                    const error = await response.json();
+                    errorDetails = error.error?.message || JSON.stringify(error);
+                    if (errorDetails.includes('Invalid API key')) {
+                        errorMsg = 'API Key inválida. Verifique se a chave está correta nas configurações.';
+                        errorTip = 'Acesse https://platform.openai.com/account/api-keys para obter uma chave válida.';
+                    } else if (errorDetails.includes('maximum context length')) {
+                        errorMsg = 'Limite de tokens excedido. Reduza o texto de entrada ou diminua o valor de "Máximo de tokens" nas configurações.';
+                    } else if (errorDetails.includes('model')) {
+                        errorMsg = 'Modelo informado inválido ou indisponível. Verifique o modelo selecionado nas configurações.';
+                    } else if (errorDetails.includes('You exceeded your current quota')) {
+                        errorMsg = 'Limite de uso da OpenAI excedido. Verifique seu plano ou saldo na OpenAI.';
+                        errorTip = 'Acesse https://platform.openai.com/account/usage para mais informações.';
+                    } else if (errorDetails.includes('network') || errorDetails.includes('Failed to fetch')) {
+                        errorMsg = 'Problema de rede ao acessar a OpenAI. Verifique sua conexão com a internet.';
+                    } else {
+                        errorMsg += ` Detalhes: ${errorDetails}`;
+                    }
+                } catch (jsonErr) {
+                    errorMsg += ' (Falha ao processar detalhes do erro)';
+                }
+                new Notice(errorMsg + (errorTip ? `\nDica: ${errorTip}` : ''));
+                return null;
             }
 
             const data = await response.json();
+            if (!data.choices || !data.choices[0] || !data.choices[0].message || !data.choices[0].message.content) {
+                new Notice('A resposta da OpenAI veio vazia ou em formato inesperado. Tente novamente ou revise o prompt/modelo.');
+                return null;
+            }
             return data.choices[0].message.content;
         } catch (error) {
+            let errorMsg = 'Erro ao chamar a API da OpenAI.';
+            if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                errorMsg = 'Falha de rede ao conectar com a OpenAI. Verifique sua conexão com a internet.';
+            } else if (error.message) {
+                errorMsg += ` Detalhes: ${error.message}`;
+            }
+            new Notice(errorMsg);
             console.error('Erro ao chamar a API da OpenAI:', error);
-            new Notice(`Erro ao chamar a API da OpenAI: ${error.message}`);
             return null;
         }
     }
@@ -352,33 +386,49 @@ class OpenAIAssistantSettingTab {
                 .setPlaceholder('sk-...')
                 .setValue(this.plugin.settings.apiKey)
                 .onChange(async (value) => {
-                    this.plugin.settings.apiKey = value;
-                    await this.plugin.saveSettings();
+                    if (!value || !value.startsWith('sk-')) {
+                        new Notice('A API Key deve começar com "sk-" e não pode estar vazia.');
+                        text.inputEl.addClass('is-invalid');
+                    } else {
+                        text.inputEl.removeClass('is-invalid');
+                        this.plugin.settings.apiKey = value;
+                        await this.plugin.saveSettings();
+                    }
                 }));
 
         new Setting(containerEl)
             .setName('Modelo')
-            .setDesc('Modelo da OpenAI a ser utilizado')
-            .addDropdown(dropdown => dropdown
-                .addOption('gpt-4-turbo', 'GPT-4 Turbo')
-                .addOption('gpt-4', 'GPT-4')
-                .addOption('gpt-3.5-turbo', 'GPT-3.5 Turbo')
+            .setDesc('Modelo da OpenAI a ser usado')
+            .addText(text => text
+                .setPlaceholder('gpt-4.1')
                 .setValue(this.plugin.settings.model)
                 .onChange(async (value) => {
-                    this.plugin.settings.model = value;
-                    await this.plugin.saveSettings();
+                    if (!value || value.trim().length === 0) {
+                        new Notice('O modelo não pode estar vazio.');
+                        text.inputEl.addClass('is-invalid');
+                    } else {
+                        text.inputEl.removeClass('is-invalid');
+                        this.plugin.settings.model = value;
+                        await this.plugin.saveSettings();
+                    }
                 }));
 
         new Setting(containerEl)
             .setName('Temperatura')
-            .setDesc('Controla a aleatoriedade das respostas (0-1)')
-            .addSlider(slider => slider
-                .setLimits(0, 1, 0.1)
-                .setValue(this.plugin.settings.temperature)
-                .setDynamicTooltip()
+            .setDesc('Controla a aleatoriedade da resposta (0-2)')
+            .addText(text => text
+                .setPlaceholder('0.17')
+                .setValue(String(this.plugin.settings.temperature))
                 .onChange(async (value) => {
-                    this.plugin.settings.temperature = value;
-                    await this.plugin.saveSettings();
+                    const parsedValue = parseFloat(value);
+                    if (isNaN(parsedValue) || parsedValue < 0 || parsedValue > 2) {
+                        new Notice('A temperatura deve ser um número entre 0 e 2.');
+                        text.inputEl.addClass('is-invalid');
+                    } else {
+                        text.inputEl.removeClass('is-invalid');
+                        this.plugin.settings.temperature = parsedValue;
+                        await this.plugin.saveSettings();
+                    }
                 }));
 
         new Setting(containerEl)
@@ -389,11 +439,243 @@ class OpenAIAssistantSettingTab {
                 .setValue(String(this.plugin.settings.maxTokens))
                 .onChange(async (value) => {
                     const parsedValue = parseInt(value);
-                    if (!isNaN(parsedValue)) {
+                    if (isNaN(parsedValue) || parsedValue <= 0) {
+                        new Notice('O máximo de tokens deve ser um número inteiro positivo.');
+                        text.inputEl.addClass('is-invalid');
+                    } else {
+                        text.inputEl.removeClass('is-invalid');
                         this.plugin.settings.maxTokens = parsedValue;
                         await this.plugin.saveSettings();
                     }
                 }));
+    }
+}
+
+// Modal para criar notas
+class CreateNoteModal extends Modal {
+    constructor(app, plugin) {
+        super(app);
+        this.plugin = plugin;
+        this.prompt = '';
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl('h2', { text: 'Criar nota com IA' });
+
+        // Campo para prompt
+        new Setting(contentEl)
+            .setName('Descreva o conteúdo da nota')
+            .setDesc('Informe o que você deseja que a IA crie')
+            .addTextArea(text => text
+                .setPlaceholder('Ex: Uma nota sobre os principais conceitos de Kabalah...')
+                .onChange(value => {
+                    this.prompt = value;
+                }));
+
+        // Botões
+        const buttonDiv = contentEl.createDiv();
+        buttonDiv.addClass('modal-button-container');
+
+        const cancelButton = buttonDiv.createEl('button', { text: 'Cancelar' });
+        cancelButton.addEventListener('click', () => this.close());
+
+        const createButton = buttonDiv.createEl('button', { text: 'Criar' });
+        createButton.addClass('mod-cta');
+        createButton.addEventListener('click', async () => {
+            if (!this.prompt) {
+                new Notice('Por favor, insira um prompt.');
+                return;
+            }
+
+            new Notice('Gerando conteúdo com IA...');
+            createButton.disabled = true;
+
+            const systemPrompt = "Você é um assistente especializado em criar conteúdo estruturado em formato Markdown. Crie conteúdo organizado, detalhado e informativo baseado na solicitação do usuário.";
+            const result = await this.plugin.callOpenAI(this.prompt, systemPrompt);
+
+            if (result) {
+                // Criar nova nota com o conteúdo gerado
+                const fileName = this.generateFileName();
+                this.app.vault.create(fileName, result)
+                    .then(() => {
+                        new Notice(`Nota '${fileName}' criada com sucesso!`);
+                        this.close();
+                    })
+                    .catch(error => {
+                        console.error('Erro ao criar a nota:', error);
+                        new Notice(`Erro ao criar a nota: ${error.message}`);
+                        createButton.disabled = false;
+                    });
+            } else {
+                new Notice('Não foi possível gerar o conteúdo.');
+                createButton.disabled = false;
+            }
+        });
+    }
+
+    generateFileName() {
+        const date = new Date();
+        const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        return `notas/IA_Gerada_${dateStr}.md`;
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+// Modal para editar conteúdo
+class EditContentModal extends Modal {
+    constructor(app, plugin, content, editor) {
+        super(app);
+        this.plugin = plugin;
+        this.content = content;
+        this.editor = editor;
+        this.instruction = '';
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl('h2', { text: 'Editar com IA' });
+
+        // Mostrar o conteúdo selecionado
+        contentEl.createEl('h3', { text: 'Conteúdo selecionado:' });
+        const contentDiv = contentEl.createDiv();
+        contentDiv.addClass('content-preview');
+        contentDiv.setText(this.content.length > 300 ? this.content.substring(0, 300) + '...' : this.content);
+
+        // Campo para instruções
+        new Setting(contentEl)
+            .setName('Instruções para edição')
+            .setDesc('Como a IA deve modificar o conteúdo?')
+            .addTextArea(text => text
+                .setPlaceholder('Ex: Reescreva de forma mais formal...')
+                .onChange(value => {
+                    this.instruction = value;
+                }));
+
+        // Botões
+        const buttonDiv = contentEl.createDiv();
+        buttonDiv.addClass('modal-button-container');
+
+        const cancelButton = buttonDiv.createEl('button', { text: 'Cancelar' });
+        cancelButton.addEventListener('click', () => this.close());
+
+        const editButton = buttonDiv.createEl('button', { text: 'Editar' });
+        editButton.addClass('mod-cta');
+        editButton.addEventListener('click', async () => {
+            if (!this.instruction) {
+                new Notice('Por favor, insira instruções para a edição.');
+                return;
+            }
+
+            new Notice('Editando conteúdo com IA...');
+            editButton.disabled = true;
+
+            const prompt = `Conteúdo original: "${this.content}"\n\nInstruções: ${this.instruction}`;
+            const systemPrompt = "Você é um editor especializado. Modifique o conteúdo fornecido de acordo com as instruções do usuário, mantendo o formato Markdown e a essência original quando apropriado.";
+            const result = await this.plugin.callOpenAI(prompt, systemPrompt);
+
+            if (result) {
+                this.editor.replaceSelection(result);
+                this.close();
+            } else {
+                new Notice('Não foi possível editar o conteúdo.');
+                editButton.disabled = false;
+            }
+        });
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
+    }
+}
+
+// Modal para verificar conteúdo
+class VerifyContentModal extends Modal {
+    constructor(app, plugin, content) {
+        super(app);
+        this.plugin = plugin;
+        this.content = content;
+        this.verifyType = 'gramatical';
+    }
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl('h2', { text: 'Verificar conteúdo com IA' });
+
+        // Mostrar o conteúdo selecionado
+        contentEl.createEl('h3', { text: 'Conteúdo a verificar:' });
+        const contentDiv = contentEl.createDiv();
+        contentDiv.addClass('content-preview');
+        contentDiv.setText(this.content.length > 300 ? this.content.substring(0, 300) + '...' : this.content);
+
+        // Opções de verificação
+        new Setting(contentEl)
+            .setName('Tipo de verificação')
+            .setDesc('Escolha o tipo de verificação a ser realizada')
+            .addDropdown(dropdown => dropdown
+                .addOption('gramatical', 'Verificação gramatical e ortográfica')
+                .addOption('factual', 'Verificação de fatos e consistência')
+                .addOption('estilo', 'Verificação de estilo e clareza')
+                .setValue(this.verifyType)
+                .onChange(value => {
+                    this.verifyType = value;
+                }));
+
+        // Botões
+        const buttonDiv = contentEl.createDiv();
+        buttonDiv.addClass('modal-button-container');
+
+        const cancelButton = buttonDiv.createEl('button', { text: 'Cancelar' });
+        cancelButton.addEventListener('click', () => this.close());
+
+        const verifyButton = buttonDiv.createEl('button', { text: 'Verificar' });
+        verifyButton.addClass('mod-cta');
+        verifyButton.addEventListener('click', async () => {
+            new Notice('Verificando conteúdo com IA...');
+            verifyButton.disabled = true;
+
+            let systemPrompt = "Você é um assistente especializado em verificação de conteúdo. ";
+            if (this.verifyType === 'gramatical') {
+                systemPrompt += "Analise o texto para encontrar erros gramaticais, ortográficos e de pontuação.";
+            } else if (this.verifyType === 'factual') {
+                systemPrompt += "Analise o texto para verificar a consistência, coerência e precisão factual aparente.";
+            } else {
+                systemPrompt += "Analise o texto quanto ao estilo, clareza, concisão e eficácia comunicativa.";
+            }
+
+            const prompt = `Por favor, verifique o seguinte conteúdo:\n\n${this.content}\n\nForneça uma análise detalhada, destacando problemas e sugerindo melhorias.`;
+            const result = await this.plugin.callOpenAI(prompt, systemPrompt);
+
+            if (result) {
+                // Criar nota de análise
+                const fileName = `notas/Análise_${new Date().toISOString().replace(/[:.]/g, '-')}.md`;
+                const content = `# Análise de Conteúdo (${this.verifyType})\n\n## Conteúdo Original\n\n\\n${this.content}\n\\n\n## Análise\n\n${result}`;
+                
+                this.app.vault.create(fileName, content)
+                    .then(() => {
+                        new Notice(`Análise criada em '${fileName}'!`);
+                        this.close();
+                    })
+                    .catch(error => {
+                        console.error('Erro ao criar a nota de análise:', error);
+                        new Notice(`Erro ao criar a nota de análise: ${error.message}`);
+                        verifyButton.disabled = false;
+                    });
+            } else {
+                new Notice('Não foi possível verificar o conteúdo.');
+                verifyButton.disabled = false;
+            }
+        });
+    }
+
+    onClose() {
+        const { contentEl } = this;
+        contentEl.empty();
     }
 }
 
