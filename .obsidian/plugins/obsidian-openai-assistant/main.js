@@ -507,6 +507,74 @@ class OpenAIAssistantPlugin extends Plugin {
             return false;
         }
     }
+    
+    // Excluir um arquivo do vault
+    async deleteFile(filePath) {
+        try {
+            const file = this.app.vault.getAbstractFileByPath(filePath);
+            if (!file) {
+                return { success: false, message: `O arquivo ${filePath} não foi encontrado.` };
+            }
+            
+            if (file instanceof TFile) {
+                await this.app.vault.delete(file);
+                new Notice(`Arquivo ${file.basename} excluído com sucesso.`);
+                return { success: true, message: `Arquivo ${filePath} excluído com sucesso.` };
+            } else if (file instanceof TFolder) {
+                await this.app.vault.delete(file, true); // true para recursivamente deletar o conteúdo
+                new Notice(`Pasta ${file.basename} e seu conteúdo excluídos com sucesso.`);
+                return { success: true, message: `Pasta ${filePath} e seu conteúdo excluídos com sucesso.` };
+            } else {
+                return { success: false, message: `O caminho ${filePath} não é um arquivo ou pasta válido.` };
+            }
+        } catch (error) {
+            console.error(`Erro ao excluir arquivo ${filePath}:`, error);
+            new Notice(`Erro ao excluir arquivo: ${error.message}`);
+            return { success: false, message: `Erro ao excluir arquivo: ${error.message}` };
+        }
+    }
+    
+    // Editar o conteúdo de um arquivo existente
+    async editFile(filePath, newContent, options = { replace: false, createIfNotExist: false }) {
+        try {
+            const file = this.app.vault.getAbstractFileByPath(filePath);
+            
+            // Se o arquivo não existe
+            if (!file) {
+                if (options.createIfNotExist) {
+                    // Criar o arquivo se a opção estiver habilitada
+                    const result = await this.createNote(filePath, newContent, false);
+                    if (result.success) {
+                        new Notice(`Arquivo ${filePath} criado com sucesso.`);
+                    }
+                    return result;
+                } else {
+                    return { success: false, message: `O arquivo ${filePath} não foi encontrado.` };
+                }
+            }
+            
+            // Verificar se é um arquivo
+            if (!(file instanceof TFile)) {
+                return { success: false, message: `O caminho ${filePath} não é um arquivo válido.` };
+            }
+            
+            // Ler o conteúdo atual se não for para substituir tudo
+            if (!options.replace) {
+                const currentContent = await this.app.vault.read(file);
+                // Concatenar o novo conteúdo com o existente
+                newContent = currentContent + '\n\n' + newContent;
+            }
+            
+            // Modificar o arquivo
+            await this.app.vault.modify(file, newContent);
+            new Notice(`Arquivo ${file.basename} editado com sucesso.`);
+            return { success: true, message: `Arquivo ${filePath} editado com sucesso.` };
+        } catch (error) {
+            console.error(`Erro ao editar arquivo ${filePath}:`, error);
+            new Notice(`Erro ao editar arquivo: ${error.message}`);
+            return { success: false, message: `Erro ao editar arquivo: ${error.message}` };
+        }
+    }
 }
 
 // Classe da visualização do chatbot
