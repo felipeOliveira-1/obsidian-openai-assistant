@@ -1,0 +1,20 @@
+{
+  "name": "obsidian-openai-assistant",
+  "version": "1.0.0",
+  "description": "Integração com OpenAI que permite criar, editar e verificar itens no vault",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "obsidian",
+    "openai",
+    "ai",
+    "assistant"
+  ],
+  "author": "Usuário Obsidian",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.5.0"
+  }
+}

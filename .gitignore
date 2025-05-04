@@ -1,0 +1,45 @@
+# Obsidian vault
+.obsidian/*
+!.obsidian/plugins/
+!.obsidian/plugins/obsidian-openai-assistant/
+.obsidian/plugins/obsidian-openai-assistant/data.json
+.obsidian/workspace*
+.obsidian/hotkeys.json
+.obsidian/app.json
+.obsidian/appearance.json
+.obsidian/core-plugins.json
+.obsidian/community-plugins.json
+.trash/
+
+# Node/NPM
+node_modules/
+package-lock.json
+
+# Arquivos temporários e backups
+*.md.temp
+*.md.bak
+*.js.bak
+*.js.backup
+*.js.new
+*.backup
+
+# Arquivos de ambiente com chaves de API
+.env
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Arquivos de log
+*.log
+npm-debug.log*
+
+# Arquivos temporários ou de cache
+.tmp/
+.cache/
+.vscode/
+
+# Arquivos de configuração local que podem variar entre ambientes
+setup_git.bat
+setup_git.ps1
